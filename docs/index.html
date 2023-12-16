@@ -20,6 +20,9 @@
       width: 100%;
       height: 100%;
     }
+    body {
+      	font-family: sans-serif;
+    }
     h1 {
       position: fixed;
       top: 0;
@@ -33,7 +36,9 @@
       line-height: 1.5;
       padding: 0.5rem;
       text-align: center;
-      font-family: 'sans-serif';
+    }
+    .maplibre-ctrl {
+      margin-top: 100px
     }
   </style>
 </head>
@@ -180,6 +185,20 @@
           'text-halo-color': 'crimson',
         }
       })
+
+      const max = vertices.reduce((prev, vertex) => {
+        const currentlength = (vertex.properties.neighbor_codes || []).length
+        return Math.max(prev, currentlength)
+      }, 0)
+
+      const hubs = []
+      for (const vertex of vertices) {
+        const currentlength = (vertex.properties.neighbor_codes || []).length
+        if(max === currentlength) {
+          hubs.push(vertex.properties.name)
+        }
+      }
+      console.log(`隣接数が最大の自治体は ${hubs} で、隣接数は ${max} です。`)
     }
     main()
   </script>
