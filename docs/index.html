@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>市区町村トポロジー</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      width: 100vw;
+      height: 100vh;
+    }
+    h1 {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      margin: 0;
+      padding: 0;
+      background: rgba(255, 255, 255, 0.8);
+      font-size: 1.5rem;
+      font-weight: normal;
+      line-height: 1.5;
+      padding: 0.5rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="map" data-hash="on"></div>
+  <h1>市区町村隣接ネットワーク</h1>
+  <script src="https://cdn.geolonia.com/v1/embed?geolonia-api-key=YOUR-API-KEY"></script>
+  <script>
+    const main = async () => {
+      const map = new window.geolonia.Map('#map')
+      const [resp] = await Promise.all([
+        fetch('./out.jsons'),
+        new Promise(resolve => map.once('load', resolve)),
+      ])
+      const jsons = await resp.text()
+      const data = jsons
+        .split('\n')
+        .filter(x => !!x)
+        .reduce((prev, line) => {
+          const { code, ...item } = JSON.parse(line)
+          item.center = JSON.parse(item.center)
+          if(item.name.endsWith('市') ||
+             item.name.endsWith('区') ||
+             item.name.endsWith('町') ||
+             item.name.endsWith('村')) {
+            prev.set(code, item)
+          }
+          return prev
+        }, new Map())
+      const vertices = Array.from(data.values()).map(item => {
+        const { center: geometry, ...properties } = item
+        return {
+          type: 'Feature',
+          properties,
+          geometry,
+        }
+      })
+
+      const edges = Array.from(data.values()).map(item => {
+        const { center: p1, code, neighbor_codes } = item
+        return (neighbor_codes || []).map(neighbor_code => {
+          const neighbor_item = data.get(neighbor_code)
+          if(neighbor_item) {
+            const { center: p2 } = neighbor_item
+            return {
+              type: 'Feature',
+              properties: null,
+              geometry: {
+                type: 'LineString',
+                coordinates: [p1.coordinates, p2.coordinates],
+              },
+            }
+          } else {
+            return null
+          }
+        })
+      })
+      .flat()
+      .filter(item => !!item)
+
+      map.addSource('vertices', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: vertices,
+        },
+      })
+      map.addSource('edges', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: edges,
+        },
+      })
+      map.addLayer({
+        id: 'edges',
+        type: 'line',
+        source: 'edges',
+        paint: {
+          'line-width': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10, 2,
+            14, 4,
+          ],
+          'line-color': 'red',
+        },
+      })
+      map.addLayer({
+        id: 'vertices-1',
+        type: 'circle',
+        source: 'vertices',
+        minzoom: 8,
+        paint: {
+          'circle-radius': 20,
+          'circle-color': 'red',
+        },
+      })
+      map.addLayer({
+        id: 'vertices-2',
+        type: 'circle',
+        source: 'vertices',
+        minzoom: 8,
+        paint: {
+          'circle-radius': 16,
+          'circle-color': 'white',
+        },
+      })
+      map.addLayer({
+        id: 'vertices-label',
+        type: 'symbol',
+        source: 'vertices',
+        minzoom: 8,
+        layout: {
+          'text-field': '{name}',
+          'text-size': 16,
+          'text-font': ['Noto Sans Bold'],
+        },
+        paint: {
+          'text-color': 'white',
+          'text-halo-width': 2,
+          'text-halo-color': 'crimson',
+        }
+      })
+    }
+    main()
+  </script>
+</body>
+</html>
