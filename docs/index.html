@@ -37,8 +37,8 @@
       padding: 0.5rem;
       text-align: center;
     }
-    .maplibre-ctrl {
-      margin-top: 100px
+    .maplibregl-ctrl-top-left, .maplibregl-ctrl-top-right {
+      margin-top: 50px
     }
   </style>
 </head>
@@ -51,19 +51,22 @@
       const map = new window.geolonia.Map('#map')
       const [resp] = await Promise.all([
         fetch('./out.jsons'),
-        new Promise(resolve => map.once('load', resolve)),
+        new Promise(resolve => map.on('load', resolve)),
       ])
       const jsons = await resp.text()
+
       const data = jsons
         .split('\n')
         .filter(x => !!x)
         .reduce((prev, line) => {
           const { code, ...item } = JSON.parse(line)
           item.center = JSON.parse(item.center)
-          if(item.name.endsWith('市') ||
-             item.name.endsWith('区') ||
-             item.name.endsWith('町') ||
-             item.name.endsWith('村')) {
+          const type = item.name.slice(-1)
+          if(type === '市' ||
+            type === '区' ||
+            type === '町' ||
+            type === '村') {
+            code.type = type
             prev.set(code, item)
           }
           return prev
@@ -78,11 +81,11 @@
       })
 
       const edges = Array.from(data.values()).map(item => {
-        const { center: p1, code, neighbor_codes } = item
+        const { center: p1, code, neighbor_codes, type: type1 } = item
         return (neighbor_codes || []).map(neighbor_code => {
           const neighbor_item = data.get(neighbor_code)
           if(neighbor_item) {
-            const { center: p2 } = neighbor_item
+            const { center: p2, type: type2 } = neighbor_item
             return {
               type: 'Feature',
               properties: null,
@@ -112,7 +115,7 @@
           type: 'FeatureCollection',
           features: edges,
         },
-        attribution: '国土数値情報のデータを加工して作成',
+        attribution: '<a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-v3_1.html">国土数値情報（行政区域データ）</a>を <a href="https://github.com/kamataryo/jp-admin-adjacency">@kamataryo</a> が加工して作成',
       })
       map.addLayer({
         id: 'edges',
@@ -175,13 +178,13 @@
         minzoom: 8,
         layout: {
           'text-field': '{name}',
-          'text-size': 16,
+          'text-size': 20,
           'text-font': ['Noto Sans Bold'],
           'text-allow-overlap': true,
         },
         paint: {
           'text-color': 'white',
-          'text-halo-width': 2,
+          'text-halo-width': 3,
           'text-halo-color': 'crimson',
         }
       })
